@@ -1,6 +1,5 @@
 from app.models import User
 
-
 def check_signup(data):
     required_fields = ["username", "password", "phonenumber", "role"]
     

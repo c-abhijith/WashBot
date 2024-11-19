@@ -1,9 +1,11 @@
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request
 from flask_restful import Resource, Api
 from app.helper.body_validator import check_signup, check_login
 from app.models import User
 from app.extensions import db
 from app.helper.auth_helper import password_hash, verify_password,access_token,refres_token
+from flask_jwt_extended import jwt_required, get_jwt_identity
+
 
 auth_bp = Blueprint('auth', __name__)
 api = Api(auth_bp)
@@ -16,7 +18,7 @@ class Signup(Resource):
             if signup_check:
                 return signup_check
             
-            # Check if user already exists
+            
             if User.query.filter_by(username=data["username"]).first():
                 return {"message": "Username already exists"}, 400
                 
@@ -47,7 +49,6 @@ class Login(Resource):
             
             if not user or not verify_password(data["password"], user.password):
                 return {"message": "Invalid username or password"}, 401
-            
 
             accessh_token = access_token(user)
             refresh_token = refres_token(user)
@@ -76,7 +77,6 @@ class RefreshToken(Resource):
             if not user:
                 return {"message": "User not found"}, 404
             
-            # Create new access token
             accessh_token = access_token(user)
             
             return {
@@ -87,14 +87,13 @@ class RefreshToken(Resource):
             return {"message": "Error refreshing token",
                     "error": str(error)}, 500
 
-# Protected route example
 class ProtectedRoute(Resource):
     @jwt_required()
     def get(self):
         current_user_id = get_jwt_identity()
         return {"logged_in_as": current_user_id}, 200
 
-# Register routes
+
 api.add_resource(Signup, '/signup')
 api.add_resource(Login, '/login')
 api.add_resource(RefreshToken, '/refresh')
