@@ -10,7 +10,6 @@ service_bp = Blueprint('service', __name__)
 api = Api(service_bp)
 
 class ServiceList(Resource):
-    @jwt_required()
     def get(self):
         """Get all services (public access)"""
         try:

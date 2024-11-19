@@ -90,9 +90,13 @@ class Login(Resource):
             
             return {
                 "message": "Login successful",
-                "access_token": access_token_str,
-                "refresh_token": refresh_token_str,
-                "user": user.to_dict()
+                "accessToken": access_token_str,
+                "refreshToken": refresh_token_str,
+                "user": {
+                    "id": str(user.id),
+                    "username": user.username,
+                    "role": user.role
+                }
             }, 200
         except Exception as error:
             return {"message": "An error occurred during login",
