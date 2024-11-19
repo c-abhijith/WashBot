@@ -9,7 +9,7 @@ def check_signup(data):
         if not data[field]:
             return {"message": f"{field} cannot be empty"}, 400
             
-    if data["role"] not in ["user", "admin"]:
+    if data["role"] not in ["user", "admin","staff"]:
         return {"message": "Invalid role. Must be 'user' or 'admin'"}, 400
     
     return None

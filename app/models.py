@@ -9,7 +9,7 @@ class User(db.Model):
     username = db.Column(db.String(100), unique=True, nullable=False)
     phonenumber = db.Column(db.String(15), nullable=False)
     password = db.Column(db.String(255), nullable=False)
-    role = db.Column(db.Enum('user', 'admin', name='user_roles'), nullable=False)
+    role = db.Column(db.Enum('user', 'admin','staff', name='user_roles'), nullable=False)
 
 class Vehicle(db.Model):
     id = db.Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)

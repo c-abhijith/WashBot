@@ -3,7 +3,7 @@ from flask import jsonify
 def register_error_handlers(app, jwt):
     @app.errorhandler(404)
     def not_found(e):
-        return jsonify({"message": "Resource not found"}), 404
+        return jsonify({"message": "These API is not found"}), 404
 
     @app.errorhandler(500)
     def server_error(e):
