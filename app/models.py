@@ -1,6 +1,6 @@
 import uuid
 from sqlalchemy.dialects.postgresql import UUID
-from . import db
+from app.extensions import db
 
 
 class User(db.Model):
