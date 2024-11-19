@@ -37,6 +37,6 @@ class Booking(db.Model):
     time_to = db.Column(db.Time, nullable=False)
     duration = db.Column(db.Integer, nullable=False)
     status = db.Column(
-        db.Enum('booked', 'startservice', 'complete', name='booking_status'), 
+        db.Enum('booked','pending', 'startservice', 'complete', name='booking_status'), 
         nullable=False
     )

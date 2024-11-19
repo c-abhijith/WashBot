@@ -4,6 +4,7 @@ from config import Config
 from app.error_handlers import register_error_handlers
 from app.models import User, Service
 from app.routers.vehicle import vehicle_bp
+from app.routers.booking import booking_bp
 
 def create_app():
     app = Flask(__name__)
@@ -26,6 +27,7 @@ def create_app():
     app.register_blueprint(user_bp)
     app.register_blueprint(service_bp)
     app.register_blueprint(vehicle_bp)
+    app.register_blueprint(booking_bp)
     
     return app
     
