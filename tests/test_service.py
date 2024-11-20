@@ -10,7 +10,7 @@ class ServiceTestCase(unittest.TestCase):
     def setUpClass(cls):
         cls.app = create_app()
         cls.app.config['TESTING'] = True
-        cls.app.config['SQLALCHEMY_DATABASE_URI'] = "postgresql://postgres:postgres@localhost:5432/washbot_test"
+        cls.app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///:memory:'
         cls.client = cls.app.test_client()
         
         # Create application context

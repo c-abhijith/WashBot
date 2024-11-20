@@ -1,5 +1,10 @@
 .env
 venv/
 __pycache__/
+*.pyc
+.DS_Store
+app.db
+test.db
+*.sqlite
 test_reports/
 instance/
