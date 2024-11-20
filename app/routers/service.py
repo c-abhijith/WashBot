@@ -14,6 +14,7 @@ class ServiceList(Resource):
         """Get all services (public access)"""
         try:
             services = Service.query.all()
+            print(services)
             services_data = [{
                 "id": str(service.id),
                 "service_name": service.service_name,

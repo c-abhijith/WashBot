@@ -74,27 +74,3 @@ class Payment(db.Model):
 
     # Relationship
     booking = db.relationship('Booking', backref=db.backref('payment', uselist=False))
-
-    def set_payment_response(self, response_dict):
-        """Store dictionary as JSON string"""
-        self.payment_response = json.dumps(response_dict)
-
-    def get_payment_response(self):
-        """Retrieve JSON string as dictionary"""
-        if self.payment_response:
-            return json.loads(self.payment_response)
-        return None
-
-    def to_dict(self):
-        return {
-            'id': self.id,
-            'booking_id': self.booking_id,
-            'amount': self.amount,
-            'currency': self.currency,
-            'payment_method': self.payment_method,
-            'payment_status': self.payment_status,
-            'transaction_id': self.transaction_id,
-            'payment_response': self.get_payment_response(),
-            'created_at': self.created_at.strftime('%Y-%m-%d %H:%M:%S'),
-            'updated_at': self.updated_at.strftime('%Y-%m-%d %H:%M:%S')
-        }

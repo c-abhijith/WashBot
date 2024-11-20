@@ -7,6 +7,7 @@ from app.middleware.auth_middleware import admin_required, user_admin_required, 
 from app.helper.payment_helper import PaymentGateway
 import uuid
 from datetime import datetime
+from app.response import success_response,server_response
 
 booking_bp = Blueprint('booking', __name__)
 api = Api(booking_bp)
@@ -14,12 +15,9 @@ api = Api(booking_bp)
 class BookingList(Resource):
     @jwt_required()
     def get(self):
-        """Get all bookings for current user"""
         try:
-            current_user_id = get_jwt_identity()
-            user_uuid = uuid.UUID(current_user_id)
-            
-            bookings = Booking.query.filter_by(user_id=user_uuid).all()
+            user_id = get_jwt_identity()
+            bookings = Booking.query.filter_by(user_id=user_id).all()
             
             bookings_data = [{
                 "id": str(booking.id),
@@ -50,23 +48,22 @@ class BookingList(Resource):
             }, 200
             
         except Exception as error:
-            return {
-                "message": "An error occurred while fetching bookings",
-                "error": str(error)
-            }, 500
+            return server_response.data_error(error), 500
 
     @jwt_required()
     def post(self):
         """Create new booking"""
         try:
             current_user_id = get_jwt_identity()
-            user_uuid = uuid.UUID(current_user_id)
-            
             data = request.get_json()
             
+            # Convert UUIDs to strings
+            service_id = str(data['service_id'])
+            vehicle_id = str(data['vehicle_id'])
+            
             # Validate service and vehicle
-            service = Service.query.get(data['service_id'])
-            vehicle = Vehicle.query.get(data['vehicle_id'])
+            service = Service.query.get(service_id)
+            vehicle = Vehicle.query.get(vehicle_id)
             
             if not service or not vehicle:
                 return {"message": "Invalid service or vehicle ID"}, 400
@@ -75,14 +72,20 @@ class BookingList(Resource):
             if str(vehicle.user_id) != current_user_id:
                 return {"message": "Vehicle does not belong to user"}, 403
             
+            # Parse date and time
+            booking_date = datetime.strptime(data['date'], '%Y-%m-%d').date()
+            time_from = datetime.strptime(data['time_from'], '%H:%M').time()
+            time_to = datetime.strptime(data['time_to'], '%H:%M').time()
+            
             # Create booking
             booking = Booking(
-                user_id=user_uuid,
-                service_id=uuid.UUID(data['service_id']),
-                vehicle_id=uuid.UUID(data['vehicle_id']),
-                date=datetime.strptime(data['date'], '%Y-%m-%d').date(),
-                time_from=datetime.strptime(data['time_from'], '%H:%M').time(),
-                time_to=datetime.strptime(data['time_to'], '%H:%M').time(),
+                id=str(uuid.uuid4()),
+                user_id=current_user_id,
+                service_id=service_id,
+                vehicle_id=vehicle_id,
+                date=booking_date,
+                time_from=time_from,
+                time_to=time_to,
                 duration=service.duration,
                 total_amount=service.price,
                 status='pending'
@@ -91,9 +94,10 @@ class BookingList(Resource):
             db.session.add(booking)
             db.session.commit()
             
-            # Initialize payment based on method
+            # Initialize payment
             payment_method = data.get('payment_method', 'stripe')
             payment = Payment(
+                id=str(uuid.uuid4()),
                 booking_id=booking.id,
                 amount=service.price,
                 payment_method=payment_method,
@@ -110,24 +114,41 @@ class BookingList(Resource):
                 payment_data = PaymentGateway.create_razorpay_payment(service.price)
             elif payment_method == 'paypal':
                 payment_data = PaymentGateway.create_paypal_payment(service.price)
+            else:
+                return {"message": "Invalid payment method"}, 400
             
-            if not payment_data['success']:
-                return {"message": "Payment initialization failed", "error": payment_data.get('error')}, 400
+            if not payment_data.get('success'):
+                return {
+                    "message": "Payment initialization failed",
+                    "error": payment_data.get('error')
+                }, 400
             
-            payment.payment_response = payment_data
+            payment.set_payment_response(payment_data)
             db.session.commit()
             
             return {
                 "message": "Booking created successfully",
                 "booking": {
-                    "id": str(booking.id),
+                    "id": booking.id,
                     "service": {
                         "id": str(service.id),
                         "name": service.service_name,
                         "price": service.price
                     },
-                    "payment_data": payment_data,
-                    "total_amount": booking.total_amount
+                    "vehicle": {
+                        "id": str(vehicle.id),
+                        "name": vehicle.vehicle_name,
+                        "numberplate": vehicle.numberplate
+                    },
+                    "date": booking.date.strftime('%Y-%m-%d'),
+                    "time_from": booking.time_from.strftime('%H:%M'),
+                    "time_to": booking.time_to.strftime('%H:%M'),
+                    "status": booking.status,
+                    "payment": {
+                        "method": payment.payment_method,
+                        "status": payment.payment_status,
+                        "data": payment_data
+                    }
                 }
             }, 201
             
