@@ -95,18 +95,11 @@ class VehicleDetail(Resource):
 
     @jwt_required()
     def delete(self, vehicle_id):
-        """Delete vehicle (owner only)"""
         try:
-            current_user_id = get_jwt_identity()
-            
             vehicle = Vehicle.query.get(vehicle_id)
             if not vehicle:
                 return {"message": "Vehicle not found"}, 404
-            
-            # Check if user is owner
-            if str(vehicle.user_id) != current_user_id:
-                return {"message": "Access denied"}, 403
-            
+
             db.session.delete(vehicle)
             db.session.commit()
             
@@ -116,16 +109,12 @@ class VehicleDetail(Resource):
             
         except Exception as error:
             db.session.rollback()
-            return {
-                "message": "An error occurred while deleting vehicle",
-                "error": str(error)
-            }, 500
+            return server_response.data_error(error), 500
 
 class AllVehicles(Resource):
     @jwt_required()
     @user_admin_required
     def get(self):
-        """Get all vehicles (admin only)"""
         try:
             vehicles = Vehicle.query.all()
             vehicles_data = [{
@@ -151,6 +140,6 @@ class AllVehicles(Resource):
             }, 500
 
 
-api.add_resource(VehicleList, '/vehicles')  # User's vehicles
-api.add_resource(VehicleDetail, '/vehicles/<string:vehicle_id>')  # Single vehicle operations
-api.add_resource(AllVehicles, '/all-vehicles')  # Admin view of all vehicles 
+api.add_resource(VehicleList, '/vehicles')  
+api.add_resource(VehicleDetail, '/vehicles/<string:vehicle_id>') 
+api.add_resource(AllVehicles, '/all-vehicles')  

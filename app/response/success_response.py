@@ -84,4 +84,4 @@ def vechile_details(vehicle):
                     "vehicle_image": vehicle.vehicle_image
                 }
             }
-    
+
