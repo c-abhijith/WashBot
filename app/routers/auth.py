@@ -3,36 +3,23 @@ from flask_restful import Resource, Api
 from app.helper.body_validator import check_signup, check_login
 from app.models import User
 from app.extensions import db
-from app.helper.auth_helper import password_hash, verify_password, access_token, refres_token
+from app.helper.auth_helper import password_hash, access_token, refres_token
 from flask_jwt_extended import jwt_required, get_jwt_identity, get_jwt
-
+from app.response import success_response,server_response
 auth_bp = Blueprint('auth', __name__)
 api = Api(auth_bp)
 
-# Create a blocklist set to store revoked tokens
-# In production, use Redis or database instead of in-memory set
 BLOCKLIST = set()
 
 class Signup(Resource):
     def post(self):
         try:
             data = request.get_json()
-            
-            # Validate input data
             signup_check = check_signup(data)
             if signup_check:
                 return signup_check
-            
-            # Check for existing user
-            existing_user = User.query.filter_by(username=data["username"]).first()
-            if existing_user:
-                return {"message": "Username already exists"}, 400
-                
             try:
-                # Hash password
                 hashed_password = password_hash(data["password"])
-                
-                # Create new user
                 new_user = User(
                     username=data["username"],
                     phonenumber=data["phonenumber"],
@@ -40,35 +27,16 @@ class Signup(Resource):
                     role=data["role"]
                 )
                 
-                # Save to database
                 db.session.add(new_user)
                 db.session.commit()
-                
-                # Prepare response
-                response_data = {
-                    "message": "User created", 
-                    "user": {
-                        "id": str(new_user.id),
-                        "username": new_user.username,
-                        "role": new_user.role,
-                        "phonenumber": new_user.phonenumber
-                    }
-                }
-                
-                return response_data, 201
+                return success_response.signup_response(new_user), 201
                 
             except Exception as db_error:
                 db.session.rollback()
-                return {
-                    "message": "Database error occurred",
-                    "error": str(db_error)
-                }, 500
+                return server_response.data_error(db_error) , 500
             
         except Exception as error:
-            return {
-                "message": "An unexpected error occurred",
-                "error": str(error)
-            }, 500
+            return server_response.unexcept_error, 500
 
 class Login(Resource):
     def post(self):
@@ -79,55 +47,34 @@ class Login(Resource):
                 return login_check
             
             user = User.query.filter_by(username=data["username"]).first()
-            if not user:
-                return {"message": "Invalid username"}, 401
-            
-            if not verify_password(data["password"], user.password):
-                return {"message": "Invalid password"}, 401
 
             access_token_str = access_token(user)
             refresh_token_str = refres_token(user)
             
-            return {
-                "message": "Login successful",
-                "accessToken": access_token_str,
-                "refreshToken": refresh_token_str,
-                "user": {
-                    "id": str(user.id),
-                    "username": user.username,
-                    "role": user.role
-                }
-            }, 200
+            return success_response.login_response(access_token_str,refresh_token_str), 200
         except Exception as error:
-            return {"message": "An error occurred during login",
-                    "error": str(error)}, 500
+            return server_response.unexcept_error(error), 500
 
 class Logout(Resource):
     @jwt_required()
     def post(self):
         try:
-            jti = get_jwt()["jti"]  # Get JWT ID
+            jti = get_jwt()["jti"]  
             BLOCKLIST.add(jti)
             return {"message": "Successfully logged out"}, 200
         except Exception as error:
-            return {
-                "message": "An error occurred during logout",
-                "error": str(error)
-            }, 500
+            return server_response.unexcept_error(error), 500
 
 class LogoutRefresh(Resource):
     @jwt_required(refresh=True)
     def post(self):
         try:
-            jti = get_jwt()["jti"]  # Get JWT ID
+            jti = get_jwt()["jti"] 
             BLOCKLIST.add(jti)
             return {"message": "Refresh token revoked"}, 200
         except Exception as error:
-            return {
-                "message": "An error occurred during refresh token revocation",
-                "error": str(error)
-            }, 500
-
+            return server_response.unexcept_error(error), 500
+        
 class RefreshToken(Resource):
     @jwt_required(refresh=True)
     def post(self):
@@ -145,8 +92,7 @@ class RefreshToken(Resource):
                 "message": "Token refreshed successfully"
             }, 200
         except Exception as error:
-            return {"message": "Error refreshing token",
-                    "error": str(error)}, 500
+            return server_response.unexcept_error(error), 500
 
 class ProtectedRoute(Resource):
     @jwt_required()

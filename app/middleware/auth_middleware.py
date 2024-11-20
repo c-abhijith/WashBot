@@ -7,10 +7,9 @@ def admin_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
         try:
-            current_user_id = get_jwt_identity()
-            user_uuid = uuid.UUID(current_user_id)
-            current_user = User.query.filter_by(id=user_uuid).first()
-            
+            user_id = get_jwt_identity()
+            current_user = User.query.filter_by(id=user_id).first()
+            print(current_user)
             if not current_user or current_user.role != 'admin':
                 return {'message': 'Admin token required'}, 403
                 
@@ -25,9 +24,8 @@ def staff_admin_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
         try:
-            current_user_id = get_jwt_identity()
-            user_uuid = uuid.UUID(current_user_id)
-            current_user = User.query.filter_by(id=user_uuid).first()
+            user_id = get_jwt_identity()
+            current_user = User.query.filter_by(id=user_id).first()
             
             if not current_user or current_user.role not in ['admin', 'staff']:
                 return {'message': 'Staff or Admin token required'}, 403
@@ -43,9 +41,8 @@ def user_admin_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
         try:
-            current_user_id = get_jwt_identity()
-            user_uuid = uuid.UUID(current_user_id)
-            current_user = User.query.filter_by(id=user_uuid).first()
+            user_id = get_jwt_identity()
+            current_user = User.query.filter_by(id=user_id).first()
             
             if not current_user or current_user.role not in ['admin', 'user']:
                 return {'message': 'User or Admin token required'}, 403
@@ -61,9 +58,8 @@ def user_staff_admin_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
         try:
-            current_user_id = get_jwt_identity()
-            user_uuid = uuid.UUID(current_user_id)
-            current_user = User.query.filter_by(id=user_uuid).first()
+            user_id = get_jwt_identity()
+            current_user = User.query.filter_by(id=user_id).first()
             
             if not current_user or current_user.role not in ['admin', 'staff', 'user']:
                 return {'message': 'Authentication required'}, 403
