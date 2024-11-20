@@ -52,35 +52,33 @@ class BookingList(Resource):
 
     @jwt_required()
     def post(self):
-        """Create new booking"""
         try:
-            current_user_id = get_jwt_identity()
+            user_id = get_jwt_identity()
             data = request.get_json()
             
-            # Convert UUIDs to strings
             service_id = str(data['service_id'])
             vehicle_id = str(data['vehicle_id'])
             
-            # Validate service and vehicle
+       
             service = Service.query.get(service_id)
             vehicle = Vehicle.query.get(vehicle_id)
             
             if not service or not vehicle:
                 return {"message": "Invalid service or vehicle ID"}, 400
             
-            # Verify vehicle belongs to user
-            if str(vehicle.user_id) != current_user_id:
+        
+            if str(vehicle.user_id) !=user_id:
                 return {"message": "Vehicle does not belong to user"}, 403
             
-            # Parse date and time
+
             booking_date = datetime.strptime(data['date'], '%Y-%m-%d').date()
             time_from = datetime.strptime(data['time_from'], '%H:%M').time()
             time_to = datetime.strptime(data['time_to'], '%H:%M').time()
             
-            # Create booking
+        
             booking = Booking(
                 id=str(uuid.uuid4()),
-                user_id=current_user_id,
+                user_id=user_id,
                 service_id=service_id,
                 vehicle_id=vehicle_id,
                 date=booking_date,
@@ -94,7 +92,7 @@ class BookingList(Resource):
             db.session.add(booking)
             db.session.commit()
             
-            # Initialize payment
+        
             payment_method = data.get('payment_method', 'stripe')
             payment = Payment(
                 id=str(uuid.uuid4()),
@@ -107,7 +105,7 @@ class BookingList(Resource):
             db.session.add(payment)
             db.session.commit()
             
-            # Create payment intent/order
+        
             if payment_method == 'stripe':
                 payment_data = PaymentGateway.create_stripe_payment(service.price)
             elif payment_method == 'razorpay':
@@ -170,7 +168,7 @@ class BookingDetail(Resource):
             if not booking:
                 return {"message": "Booking not found"}, 404
             
-            # Check if user owns booking or is admin
+        
             if str(booking.user_id) != current_user_id:
                 user = User.query.get(current_user_id)
                 if user.role != 'admin':
@@ -213,7 +211,6 @@ class BookingDetail(Resource):
     @jwt_required()
     @staff_admin_required
     def put(self, booking_id):
-        """Update booking status (staff/admin only)"""
         try:
             data = request.get_json()
             if 'status' not in data:
@@ -223,7 +220,7 @@ class BookingDetail(Resource):
             if not booking:
                 return {"message": "Booking not found"}, 404
 
-            # Validate status transition
+            
             valid_statuses = ['confirmed', 'startservice', 'complete', 'cancelled']
             if data['status'] not in valid_statuses:
                 return {
@@ -231,20 +228,19 @@ class BookingDetail(Resource):
                     "valid_statuses": valid_statuses
                 }, 400
 
-            # Get current user role
+    
             current_user_id = get_jwt_identity()
             user = User.query.get(current_user_id)
 
-            # Status transition rules
             if data['status'] == 'cancelled':
                 if user.role != 'admin':
                     return {"message": "Only admin can cancel bookings"}, 403
             
-            # Update status
+
             old_status = booking.status
             booking.status = data['status']
             
-            # If status is complete, update payment status
+        
             if data['status'] == 'complete' and booking.payment:
                 booking.payment.payment_status = 'completed'
 
@@ -286,7 +282,7 @@ class BookingDetail(Resource):
     @jwt_required()
     @staff_admin_required
     def patch(self, booking_id):
-        """Update booking status (staff/admin only)"""
+  
         try:
             data = request.get_json()
             if 'status' not in data:
@@ -296,7 +292,7 @@ class BookingDetail(Resource):
             if not booking:
                 return {"message": "Booking not found"}, 404
 
-            # Validate status transition
+    
             valid_statuses = ['confirmed', 'startservice', 'complete', 'cancelled']
             if data['status'] not in valid_statuses:
                 return {
@@ -304,20 +300,20 @@ class BookingDetail(Resource):
                     "valid_statuses": valid_statuses
                 }, 400
 
-            # Get current user role
+    
             current_user_id = get_jwt_identity()
             user = User.query.get(current_user_id)
 
-            # Status transition rules
+            
             if data['status'] == 'cancelled':
                 if user.role != 'admin':
                     return {"message": "Only admin can cancel bookings"}, 403
             
-            # Update status
+            
             old_status = booking.status
             booking.status = data['status']
             
-            # If status is complete, update payment status
+        
             if data['status'] == 'complete' and booking.payment:
                 booking.payment.payment_status = 'completed'
 
@@ -358,7 +354,7 @@ class BookingDetail(Resource):
 
     @jwt_required()
     def delete(self, booking_id):
-        """Cancel booking"""
+    
         try:
             current_user_id = get_jwt_identity()
             booking = Booking.query.get(booking_id)
@@ -366,11 +362,11 @@ class BookingDetail(Resource):
             if not booking:
                 return {"message": "Booking not found"}, 404
             
-            # Check if user owns booking
+        
             if str(booking.user_id) != current_user_id:
                 return {"message": "Access denied"}, 403
             
-            # Only allow cancellation of pending bookings
+        
             if booking.status != 'pending':
                 return {"message": "Cannot cancel non-pending booking"}, 400
             
@@ -392,7 +388,7 @@ class AllBookings(Resource):
     @jwt_required()
     @admin_required
     def get(self):
-        """Get all bookings (admin only)"""
+    
         try:
             bookings = Booking.query.all()
             
@@ -431,13 +427,12 @@ class BookingStatusUpdate(Resource):
     @jwt_required()
     @staff_admin_required
     def post(self, booking_id, status):
-        """Quick status update endpoint (staff/admin only)"""
         try:
             booking = Booking.query.get(booking_id)
             if not booking:
                 return {"message": "Booking not found"}, 404
 
-            # Validate status
+
             valid_statuses = ['confirmed', 'startservice', 'complete', 'cancelled']
             if status not in valid_statuses:
                 return {
@@ -445,19 +440,18 @@ class BookingStatusUpdate(Resource):
                     "valid_statuses": valid_statuses
                 }, 400
 
-            # Get current user role
+            
             current_user_id = get_jwt_identity()
             user = User.query.get(current_user_id)
 
-            # Status transition rules
+        
             if status == 'cancelled' and user.role != 'admin':
                 return {"message": "Only admin can cancel bookings"}, 403
 
-            # Update status
+    
             old_status = booking.status
             booking.status = status
 
-            # If status is complete, update payment status
             if status == 'complete' and booking.payment:
                 booking.payment.payment_status = 'completed'
 
@@ -483,7 +477,6 @@ class BookingStatusUpdate(Resource):
                 "error": str(error)
             }, 500
 
-# Register routes
 api.add_resource(BookingList, '/bookings')
 api.add_resource(BookingDetail, '/bookings/<string:booking_id>')
 api.add_resource(BookingStatusUpdate, '/bookings/<string:booking_id>/status/<string:status>')

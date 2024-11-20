@@ -11,7 +11,6 @@ api = Api(service_bp)
 
 class ServiceList(Resource):
     def get(self):
-        """Get all services (public access)"""
         try:
             services = Service.query.all()
             print(services)
@@ -39,7 +38,6 @@ class ServiceList(Resource):
     @jwt_required()
     @admin_required
     def post(self):
-        """Create new service (admin only)"""
         try:
             data = request.get_json()
             
@@ -75,7 +73,6 @@ class ServiceList(Resource):
 
 class ServiceDetail(Resource):
     def get(self, service_id):
-        """Get service details by ID (public access)"""
         try:
             service_uuid = uuid.UUID(service_id)
             service = Service.query.filter_by(id=service_uuid).first()
@@ -106,7 +103,6 @@ class ServiceDetail(Resource):
     @jwt_required()
     @admin_required
     def put(self, service_id):
-        """Update service details (admin only)"""
         try:
             service_uuid = uuid.UUID(service_id)
             service = Service.query.filter_by(id=service_uuid).first()
@@ -116,7 +112,7 @@ class ServiceDetail(Resource):
             
             data = request.get_json()
             
-            # Update fields if provided
+      
             if "service_name" in data:
                 service.service_name = data["service_name"]
             if "description" in data:
@@ -154,7 +150,6 @@ class ServiceDetail(Resource):
     @jwt_required()
     @admin_required
     def delete(self, service_id):
-        """Delete service (admin only)"""
         try:
             service_uuid = uuid.UUID(service_id)
             service = Service.query.filter_by(id=service_uuid).first()
