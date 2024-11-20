@@ -8,6 +8,7 @@ from app.helper.payment_helper import PaymentGateway
 import uuid
 from datetime import datetime
 from app.response import success_response,server_response
+import json
 
 booking_bp = Blueprint('booking', __name__)
 api = Api(booking_bp)
@@ -52,33 +53,35 @@ class BookingList(Resource):
 
     @jwt_required()
     def post(self):
+        """Create new booking"""
         try:
-            user_id = get_jwt_identity()
+            current_user_id = get_jwt_identity()
             data = request.get_json()
             
+            # Convert UUIDs to strings
             service_id = str(data['service_id'])
             vehicle_id = str(data['vehicle_id'])
             
-       
+            # Validate service and vehicle
             service = Service.query.get(service_id)
             vehicle = Vehicle.query.get(vehicle_id)
             
             if not service or not vehicle:
                 return {"message": "Invalid service or vehicle ID"}, 400
             
-        
-            if str(vehicle.user_id) !=user_id:
+            # Verify vehicle belongs to user
+            if str(vehicle.user_id) != current_user_id:
                 return {"message": "Vehicle does not belong to user"}, 403
             
-
+            # Parse date and time
             booking_date = datetime.strptime(data['date'], '%Y-%m-%d').date()
             time_from = datetime.strptime(data['time_from'], '%H:%M').time()
             time_to = datetime.strptime(data['time_to'], '%H:%M').time()
             
-        
+            # Create booking
             booking = Booking(
                 id=str(uuid.uuid4()),
-                user_id=user_id,
+                user_id=current_user_id,
                 service_id=service_id,
                 vehicle_id=vehicle_id,
                 date=booking_date,
@@ -92,20 +95,10 @@ class BookingList(Resource):
             db.session.add(booking)
             db.session.commit()
             
-        
+            # Initialize payment
             payment_method = data.get('payment_method', 'stripe')
-            payment = Payment(
-                id=str(uuid.uuid4()),
-                booking_id=booking.id,
-                amount=service.price,
-                payment_method=payment_method,
-                payment_status='pending'
-            )
             
-            db.session.add(payment)
-            db.session.commit()
-            
-        
+            # Create payment intent/order
             if payment_method == 'stripe':
                 payment_data = PaymentGateway.create_stripe_payment(service.price)
             elif payment_method == 'razorpay':
@@ -121,7 +114,17 @@ class BookingList(Resource):
                     "error": payment_data.get('error')
                 }, 400
             
-            payment.set_payment_response(payment_data)
+            # Create payment record
+            payment = Payment(
+                id=str(uuid.uuid4()),
+                booking_id=booking.id,
+                amount=service.price,
+                payment_method=payment_method,
+                payment_status='done',
+                payment_response=json.dumps(payment_data)  # Store payment data directly
+            )
+            
+            db.session.add(payment)
             db.session.commit()
             
             return {
@@ -477,7 +480,105 @@ class BookingStatusUpdate(Resource):
                 "error": str(error)
             }, 500
 
+class PaymentStatus(Resource):
+    @jwt_required()
+    def get(self, booking_id):
+        """Get payment status for a booking"""
+        try:
+            booking = Booking.query.get(booking_id)
+            if not booking:
+                return {"message": "Booking not found"}, 404
+
+            # Check if user owns the booking or is admin/staff
+            current_user_id = get_jwt_identity()
+            if str(booking.user_id) != current_user_id:
+                user = User.query.get(current_user_id)
+                if user.role not in ['admin', 'staff']:
+                    return {"message": "Access denied"}, 403
+
+            if not booking.payment:
+                return {"message": "No payment found for this booking"}, 404
+
+            return {
+                "message": "Payment status retrieved successfully",
+                "payment": {
+                    "id": booking.payment.id,
+                    "status": booking.payment.payment_status,
+                    "method": booking.payment.payment_method,
+                    "amount": booking.payment.amount,
+                    "transaction_id": booking.payment.transaction_id,
+                    "created_at": booking.payment.created_at.strftime('%Y-%m-%d %H:%M:%S'),
+                    "updated_at": booking.payment.updated_at.strftime('%Y-%m-%d %H:%M:%S')
+                }
+            }, 200
+
+        except Exception as error:
+            return {
+                "message": "An error occurred while fetching payment status",
+                "error": str(error)
+            }, 500
+
+    @jwt_required()
+    @staff_admin_required
+    def put(self, booking_id):
+        """Update payment status (staff/admin only)"""
+        try:
+            data = request.get_json()
+            if 'status' not in data:
+                return {"message": "Payment status is required"}, 400
+
+            booking = Booking.query.get(booking_id)
+            if not booking:
+                return {"message": "Booking not found"}, 404
+
+            if not booking.payment:
+                return {"message": "No payment found for this booking"}, 404
+
+            # Validate status
+            valid_statuses = ['pending', 'completed', 'failed', 'refunded']
+            if data['status'] not in valid_statuses:
+                return {
+                    "message": "Invalid payment status",
+                    "valid_statuses": valid_statuses
+                }, 400
+
+            # Update payment status
+            booking.payment.payment_status = data['status']
+            
+            # If payment is completed, update booking status
+            if data['status'] == 'completed':
+                booking.status = 'confirmed'
+            elif data['status'] == 'failed':
+                booking.status = 'pending'
+            elif data['status'] == 'refunded':
+                booking.status = 'cancelled'
+
+            # Add transaction ID if provided
+            if 'transaction_id' in data:
+                booking.payment.transaction_id = data['transaction_id']
+
+            db.session.commit()
+
+            return {
+                "message": "Payment status updated successfully",
+                "payment": {
+                    "id": booking.payment.id,
+                    "status": booking.payment.payment_status,
+                    "booking_status": booking.status,
+                    "transaction_id": booking.payment.transaction_id,
+                    "updated_at": booking.payment.updated_at.strftime('%Y-%m-%d %H:%M:%S')
+                }
+            }, 200
+
+        except Exception as error:
+            db.session.rollback()
+            return {
+                "message": "An error occurred while updating payment status",
+                "error": str(error)
+            }, 500
+
 api.add_resource(BookingList, '/bookings')
 api.add_resource(BookingDetail, '/bookings/<string:booking_id>')
 api.add_resource(BookingStatusUpdate, '/bookings/<string:booking_id>/status/<string:status>')
-api.add_resource(AllBookings, '/all-bookings') 
+api.add_resource(AllBookings, '/all-bookings')
+api.add_resource(PaymentStatus, '/bookings/<string:booking_id>/payment') 
